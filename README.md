@@ -3,7 +3,7 @@ This is a small example application built with ASP.NET Core MVC. It uses EF Core
 We tried to stick quite closely to Microsoft's example applications, so the directory and code structure should be more or less familiar.
 
 ## Requirements
-- .NET 7 SDK.
+- .NET 8 SDK.
 - SQL Server running locally (LocalDB is sufficient).
 - Every OS supported by .NET should work fine; we tested it on Windows and macOS.
 - The included `.sln` solution fine works in Visual Studio and Rider; but no IDE needed for this example, you can use any text editor if you like.
