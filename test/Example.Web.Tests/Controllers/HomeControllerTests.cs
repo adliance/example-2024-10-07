@@ -1,13 +1,14 @@
 using System.Net;
-using System.Net.Http.Json;
+using Adliance.Buddy.Crypto;
 using Example.Web.Controllers;
+using Example.Web.Factories.ViewModels.Home;
 using Example.Web.Models.Database;
 using Example.Web.ViewModels.Home;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using Adliance.Buddy.Crypto;
 
 namespace Example.Web.Tests.Controllers;
 
@@ -16,12 +17,16 @@ public class HomeControllerTests : IClassFixture<WebApplicationFactory<Program>>
     private readonly WebApplicationFactory<Program> _factory;
     private readonly IServiceScope _scope;
     private readonly Db _db;
+    private readonly IndexViewModelFactory _ivmf;
+    private readonly HomeController _hc;
 
     public HomeControllerTests(WebApplicationFactory<Program> factory)
     {
         _factory = factory.Init();
         _scope = _factory.Services.CreateScope();
         _db = _scope.ServiceProvider.GetRequiredService<Db>(); // most tests need to check database, so provide it here already and easier to use in specific tests
+        _ivmf = _scope.ServiceProvider.GetRequiredService<IndexViewModelFactory>();
+        _hc = new HomeController();
     }
 
     public void Dispose()
@@ -166,7 +171,6 @@ public class HomeControllerTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Missing_Required_Firstname_Field_Insertion_In_Database()
     {
-        var firstname = "Some first name";
         var lastname = "Some last name";
         var email = "Some email";
 
@@ -185,7 +189,6 @@ public class HomeControllerTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task Missing_Required_Lastname_Field_Insertion_In_Database()
     {
         var firstname = "Some first name";
-        var lastname = "Some last name";
         var email = "Some email";
 
         using var httpClient = _factory.CreateClient();
@@ -204,16 +207,76 @@ public class HomeControllerTests : IClassFixture<WebApplicationFactory<Program>>
     {
         var firstname = "Some first name";
         var lastname = "Some last name";
-        var email = "Some email";
 
         using var httpClient = _factory.CreateClient();
         var response = await httpClient.PostAsync("/", new FormUrlEncodedContent(new KeyValuePair<string, string>[]
         {
-            new("FirstName", lastname), new("LastName", lastname)
+            new("FirstName", firstname), new("LastName", lastname)
         }));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         // nothing was added, as email is required
         Assert.Empty(await _db.Registrations.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Valid_ViewModel_Check_Response_Messages()
+    {
+
+        var validViewModel = new IndexViewModel
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            EMail = "john.doe@example.com"
+        };
+
+        var result = await _hc.Index(_ivmf, validViewModel);
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+
+        var model = Assert.IsType<IndexViewModel>(viewResult.Model);
+
+        // no duplicate email address - success message
+        Assert.True(model.ShowSuccessMessage);
+        Assert.False(model.ShowErrorMessage);
+    }
+
+    [Fact]
+    public async Task Duplicate_ViewModel_Check_Response_Messages()
+    {
+
+        var validViewModel = new IndexViewModel
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            EMail = "john.doe@example.com"
+        };
+
+        var result = await _hc.Index(_ivmf, validViewModel);
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+
+        var model = Assert.IsType<IndexViewModel>(viewResult.Model);
+
+        // no duplicate email address - success message
+        Assert.True(model.ShowSuccessMessage);
+        Assert.False(model.ShowErrorMessage);
+
+        var duplicateViewModel = new IndexViewModel
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            EMail = "john.doe@example.com"
+        };
+
+        var resultDuplicate = await _hc.Index(_ivmf, duplicateViewModel);
+
+        var viewResultDuplicate = Assert.IsType<ViewResult>(resultDuplicate);
+
+        var modelDuplicate = Assert.IsType<IndexViewModel>(viewResultDuplicate.Model);
+
+        // duplicate email address - error message
+        Assert.False(modelDuplicate.ShowSuccessMessage);
+        Assert.True(modelDuplicate.ShowErrorMessage);
     }
 }
